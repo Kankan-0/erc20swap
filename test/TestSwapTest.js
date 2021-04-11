@@ -36,11 +36,40 @@ contract("testSwap functionality tests", accounts => {
             });
         })
     
-        describe("Token buying facility should work", ()=>{
+        describe("Token buying/selling facility should work", ()=>{
             it("Users are allowed to buy the tokens at a fixed rate", async ()=>{
-                await testSwap.buyTokens({from: accounts[1], value: web3.utils.toWei('1')})
-                let investorBalance = await batToken.balanceOf(accounts[1]);
-                assert.equal(investorBalance.toString(), tokens('10'));
+                const investorAccount = accounts[1]
+                const investorBalanceBefore = await batToken.balanceOf(investorAccount);
+                const exchangeBalanceBefore = await batToken.balanceOf(testSwap.address)
+                assert.equal(investorBalanceBefore.toString(), tokens('0'))
+                assert.equal(exchangeBalanceBefore.toString(), initialSupply);
+                const eventEmitted = await testSwap.buyTokens({from: investorAccount, value: tokens('1')})
+                const investorBalanceAfter = await batToken.balanceOf(investorAccount);
+                const exchangeBalanceAfter = await batToken.balanceOf(testSwap.address)
+                assert.equal(exchangeBalanceAfter.toString(), tokens('999990'))
+                assert.equal(investorBalanceAfter.toString(), tokens('10'));
+
+                assert.equal(eventEmitted.logs.length, 1);
+                assert.equal(eventEmitted.logs[0].args.account, investorAccount);
+                assert.equal(eventEmitted.logs[0].args.token, batToken.address);
+                assert.equal(eventEmitted.logs[0].args.amount.toString(), tokens('10'));
+                assert.equal(eventEmitted.logs[0].args.redemption_rate.toString(), 10);
+            })
+
+            it("Users are allowed to sell the tokens at a fixed rate", async ()=>{
+                const investorAccount = accounts[1]
+                batToken.approve(testSwap.address, tokens('6'), {from: investorAccount})
+                const investorBalanceBefore = await batToken.balanceOf(investorAccount);
+                assert.equal(investorBalanceBefore.toString(), tokens('10'));
+                const eventEmitted = await testSwap.sellTokens(tokens('6'), {from: investorAccount})
+                const investorBalanceAfter = await batToken.balanceOf(investorAccount);
+                assert.equal(investorBalanceAfter.toString(), tokens('4'));
+
+                assert.equal(eventEmitted.logs.length, 1);
+                assert.equal(eventEmitted.logs[0].args.account, investorAccount);
+                assert.equal(eventEmitted.logs[0].args.token, batToken.address);
+                assert.equal(eventEmitted.logs[0].args.amount.toString(), tokens('6'));
+                assert.equal(eventEmitted.logs[0].args.redemption_rate.toString(), 10);
             })
         })
     })
